@@ -1,0 +1,52 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>单通道数据流</title>
+
+	</head>
+	<body>
+		<input type="text" id="J_inp">
+		<span id="J_text"></span>
+	</body>
+	<script src="./jquery.js"></script>
+	<script>
+		//初始版本
+		var textCont = (function(){
+			//绑定
+			var _bind = function(that){
+				that.input.on('input', function(e){
+					that.render()
+				})
+			}
+
+			var _getNum = function(that){
+				return that.input.val().length
+			}
+
+			var  textContFun= function(){
+
+			}
+			textContFun.prototype.init = function(config){
+				this.input = $(config.id)
+				_bind(this)
+				return this;
+			}
+
+			textContFun.prototype.render = function(){
+				var num = _getNum(this)
+				if (num == 0){
+					$('#J_text').text('0个字')
+				}else
+					$('#J_text').text(num + '个字')
+			}
+			  //返回构造函数
+  			return textContFun;
+		})()
+
+		$(function(){
+			new textCont().init({id: '#J_inp'}).render()
+
+		})
+	</script>
+	
+</html>
