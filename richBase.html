@@ -1,0 +1,289 @@
+<DOCTYPE html>
+<html>
+	<head></head>
+	<body>
+		<div id="J_test_container">
+			<input type="text" id="J_input">
+			<span id="J_text"></span>
+		</div>
+		
+		<script src="./jquery.js"></script>
+		<!-- <script src="./myClass.js"></script>
+		<script src="./Event.js"></script> -->
+		
+		<script>
+			var Class = (function() {
+				var _mix = function(r, s){
+					for (var p in s){
+						if (s.hasOwnProperty(p)) {
+							r[p] = s[p]
+						}
+					}
+				}
+
+				var _extend = function(){
+					 //开关 用来使生成原型时,不调用真正的构成流程init
+					 this.initPrototype = true;
+					 var prototype = new this();
+					 this.initPrototype = false;
+
+					 var items = Array.prototype.slice.call(arguments) || []
+					 var item;
+
+					 while (item = items.shift()){
+					 	_mix(prototype, item.prototype || item)
+					 }
+
+					 function SubClass () {
+					 	if(!SubClass.initPrototype && this.init)
+					 		this.init.apply(this, arguments)//调用init真正的构造函数
+					 }
+					   // 赋值原型链，完成继承
+					 SubClass.prototype = prototype
+					 // 改变constructor引用
+					 SubClass.prototype.constructor = SubClass
+			 		// 为子类也添加extend方法
+					 SubClass.extend = _extend
+
+					 return SubClass
+				}
+
+				//超级父类
+				var Class = function(){}
+
+				Class.extend = _extend
+
+				return Class
+
+			})()
+
+			//事件查找函数
+			var _indexOf = function(arr, key){
+				if (arr === null) { return -1}
+				var i = 0, len = arr.length;
+				for(i; i<len; i++){
+					if (arr[i] === key) { return i}
+				}
+				return -1
+			}
+			//事件类
+			var Event = Class.extend({
+				//添加监听
+				on: function(key, listener){
+					 //this.__events存储所有的处理函数
+					if (!this.__events) {
+						this.__events = {}
+					}
+					if (!this.__events[key]) {
+						this.__events[key] = []
+					}
+					// 在events 设置唯一的监听函数
+					if (_indexOf(this.__events, listener) === -1 && typeof listener === 'function') {
+						this.__events[key].push(listener)
+					}
+
+					return this;
+				},
+				// fire: 触发监听
+				fire: function(key){
+					var args = Array.prototype.slice.call(arguments, 1) || [];
+					var listeners = this.__events[key]
+					var i = 0, len = listeners.length;
+					for(i; i < len; i++){
+						listeners[i].apply(this, args)
+					}
+
+					return this;
+				},
+				off: function(key, listener){
+					if (!key && !listener) {
+						this.__events = {}
+					}
+
+					if (key && !listener) {
+						delete this.__events[key]
+					}
+
+					if (key && listener) {
+						let listeners = this.__events[key],
+						index = _indexOf(listeners, listener)
+
+						(index > 1) && listeners.splice(index, 1)
+					return this;
+					}
+				}
+
+
+			})
+
+
+			// 基础函数// 
+			var Base = Class.extend(Event, {
+				init: function(config){
+					this.__config = config
+					this.bind()
+					this.render()
+				},
+				get: function(key){
+					return this.__config[key]
+				},
+				set: function(key, value){
+					this.__config[key] =  value
+				},
+				bind: function(){
+
+				},
+				render: function(){
+
+				},
+				destroy: function (argument) {
+					// this.off()
+				}
+			})
+
+			// 丰富Base类
+			var RichBase = Base.extend({
+				EVENTS: {},
+				template: '',
+				init: function(config){
+					//储存配置
+					this.__config = config
+					this._delegateEvent();
+					this.setUp();
+
+				},
+				// 代理事件函数
+				_delegateEvent: function(){
+					var self = this,
+						events = this.EVENTS ||{},
+						eventObjs ,fn, select, type,
+						parentNode = this.get('parentNode') || $(document.body)
+
+					for (select in events){
+						eventObjs = events[select]
+
+						for(type in eventObjs){
+							fn = eventObjs[type]
+							//eg: delegate(input, keyup, callback)
+							parentNode.delegate(select, type, function(e){
+								fn.call(null, self, e)
+							})
+						}
+					}
+
+				},
+				//支持underscore的极简模板语法
+			      //用来渲染模板，这边是抄的underscore的。非常简单的模板引擎，支持原生的js语法
+			      _parseTemplate:function(str,data){
+			        /**
+			         * http://ejohn.org/blog/javascript-micro-templating/
+			         * https://github.com/jashkenas/underscore/blob/0.1.0/underscore.js#L399
+			         */
+			        var fn = new Function('obj',
+			            'var p=[],print=function(){p.push.apply(p,arguments);};' +
+			            'with(obj){p.push(\'' + str
+			                .replace(/[\r\t\n]/g, " ")
+			                .split("<%").join("\t")
+			                .replace(/((^|%>)[^\t]*)'/g, "$1\r")
+			                .replace(/\t=(.*?)%>/g, "',$1,'")
+			                .split("\t").join("');")
+			                .split("%>").join("p.push('")
+			                .split("\r").join("\\'") +
+			            "');}return p.join('');")
+			        return data ? fn(data) : fn
+			    },
+			    setUp: function(){
+			        this.render()
+		        },
+		        setChuckdata: function(key, value){
+			        var self = this;
+			        var data = self.get('__renderData');
+
+			        data[key] = value
+
+			        if (!this.template) {
+			        	return
+			        }
+
+			        // console.log(data, this.template)
+
+			        var newHtmlNode = $(self._parseTemplate(this.template, data))
+			        var currentNode = self.get('__currentNode')
+			        console.log(currentNode);
+			        if (!currentNode) return
+
+			        //替换内容
+			    	currentNode.replaceWith(newHtmlNode);
+
+			    	self.set('__currentNode', newHtmlNode)
+
+	            },
+	            render: function (data) {
+	            	// body...
+	            	var self = this
+
+	            	self.set('__renderData', data)
+
+	            	if (!this.template) return
+
+	            	var html = self._parseTemplate(this.template, data)
+	            	var parentNode = this.get('parentNode') || $(document.body)
+
+	            	var currentNode = $(html)
+
+	            	self.set('__currentNode', currentNode)
+	            	parentNode.append(currentNode)
+	            },
+	            destory: function(){
+					this.off()
+					this.get('__currentNode').remove()
+					var events = this.EVENTS || {},
+						eventObjs, fn, select, type,
+						parentNode = this.get('parentNode')
+
+						for(select in events){
+							eventObjs = events[select]
+
+							for(type in eventObjs){
+								fn = eventObjs[type]
+								parentNode.undelegate(select, type, fn);
+							}							
+						}
+				},
+			})
+
+			var TextCount = RichBase.extend({
+				EVENTS: {
+					'input': {
+						keyup: function(self, e){
+							self.setChuckdata('count', self._getNum())
+						}
+					}
+				},
+				template: '<span id="J_input_count"><%= count %>个字</span>',
+				_getNum : function(){
+					return (this.get('input').val()).length || 0
+				},
+				setUp:  function(){
+					var self = this;
+					var input = this.get('parentNode').find('#J_input')
+					self.set('input', input)
+
+					var num = this._getNum()
+
+					self.render({
+						count: num
+					})
+
+				}
+			})
+
+			$(function(){
+				// 设置作用区域
+				new TextCount({
+					parentNode: $('#J_test_container')
+				})
+			})
+		</script>
+	</body>
+</html>
